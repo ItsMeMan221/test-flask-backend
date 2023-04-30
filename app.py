@@ -1,8 +1,8 @@
-from flask import jsonify, request
-from backend import app_create
+from flask import Flask, jsonify, request
+
 
 users = []
-app = app_create()
+app = Flask(__name__)
 
 
 @app.route("/health", methods=["GET"])
