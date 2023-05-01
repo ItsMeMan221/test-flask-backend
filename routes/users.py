@@ -1,16 +1,12 @@
-from flask import Flask, jsonify, request
 
 
+from flask import Blueprint, jsonify, request
+
+users_bp = Blueprint("user", __name__, url_prefix="/user")
 users = []
-app = Flask(__name__)
 
 
-@app.route("/health", methods=["GET"])
-def health_check():
-    return jsonify("OK")
-
-
-@app.route("/user", methods=["GET"])
+@users_bp.route("", methods=["GET"])
 def getUser():
     if request.method == 'GET':
         name = request.args.get('name')
@@ -31,7 +27,7 @@ def getUser():
             })
 
 
-@app.route("/user", methods=["POST"])
+@users_bp.route("", methods=["POST"])
 def addUser():
     if request.method == 'POST':
         name = request.form['name']
@@ -48,7 +44,7 @@ def addUser():
         ), 201
 
 
-@app.route("/user", methods=["PUT"])
+@users_bp.route("", methods=["PUT"])
 def editUser():
     name = request.form['name']
     email = request.form['email']
@@ -66,7 +62,7 @@ def editUser():
     }), 400
 
 
-@app.route("/user", methods=["DELETE"])
+@users_bp.route("", methods=["DELETE"])
 def deleteUser():
     name = request.args.get('name')
 
@@ -79,7 +75,3 @@ def deleteUser():
     return jsonify({
         "msg": "User {} is not exist".format(name)
     }), 404
-
-
-if (__name__ == "__main__"):
-    app.run(host="127.0.0.1", debug=True)
