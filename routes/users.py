@@ -1,6 +1,8 @@
 
 
 from flask import Blueprint, jsonify, request
+from modules.uploadImg import bucket
+import os
 
 users_bp = Blueprint("user", __name__, url_prefix="/user")
 users = []
@@ -32,9 +34,14 @@ def addUser():
     if request.method == 'POST':
         name = request.form['name']
         email = request.form['email']
+        images = request.files['avatar']
+        image_ext = os.path.splitext(images.filename)
+
+        # blob = bucket.blob(images.filename)
         user = {
             'email': email,
-            'name': name
+            'name': name,
+            'images': image_ext
         }
         users.append(user)
         return jsonify(
