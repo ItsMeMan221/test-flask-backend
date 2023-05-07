@@ -45,8 +45,8 @@ def addUser():
 
         images.filename = secrets.token_hex(16) + image_ext
         image = bucket.blob('avatar/' + images.filename)
-        image.upload_from_file(images)
-        public_url = "https://storage.googleapis.com/user-images-bucket-flask/avatar/" + images.filename
+        image.upload_from_file(images, content_type="image")
+        public_url = image.public_url
         user = {
             'email': email,
             'name': name,
