@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request
 from modules.uploadImg import bucket
 import os
+import secrets
 
 users_bp = Blueprint("user", __name__, url_prefix="/user")
 users = []
@@ -35,18 +36,26 @@ def addUser():
         name = request.form['name']
         email = request.form['email']
         images = request.files['avatar']
-        image_ext = os.path.splitext(images.filename)
+        image_ext = os.path.splitext(images.filename)[1]
 
-        # blob = bucket.blob(images.filename)
+        if image_ext != '.jpg' and image_ext != '.jpeg' and image_ext != '.png':
+            return jsonify({
+                'msg': 'image format must be jpg or png or jpeg'
+            }), 400
+
+        images.filename = secrets.token_hex(16) + image_ext
+        image = bucket.blob('avatar/' + images.filename)
+        image.upload_from_file(images)
+        public_url = "https://storage.googleapis.com/user-images-bucket-flask/avatar/" + images.filename
         user = {
             'email': email,
             'name': name,
-            'images': image_ext
+            'avatar': public_url
         }
         users.append(user)
         return jsonify(
             {
-                'msg': "User {} has been added".format(name)
+                'msg': "User {} has been added with avatar {}".format(name, public_url)
             }
         ), 201
 
