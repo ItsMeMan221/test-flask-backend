@@ -1,93 +1,92 @@
-
-
-from flask import Blueprint, jsonify, request
-from modules.uploadImg import bucket
 import os
 import secrets
+from flask import Blueprint, jsonify, request
+from sqlalchemy import delete, insert, select, update
+from models.user import User
+from module.uploadImg import bucket
+from connector import conn
+from routes.token import token_auth
+from werkzeug.security import generate_password_hash
+from routes.token import sec_keys
 
 users_bp = Blueprint("user", __name__, url_prefix="/user")
-users = []
 
 
 @users_bp.route("", methods=["GET"])
-def getUser():
-    if request.method == 'GET':
-        name = request.args.get('name')
-        if name:
-            for item_list in users:
-                if (item_list['name'] == name):
-                    return jsonify({
-                        'name': item_list['name'],
-                        'email': item_list['email'],
-                    }), 200
-            return jsonify({'msg': 'User is not exist'})
+@token_auth.login_required
+def get_user():
+    users = conn.session.scalars(select(User)).all()
 
-        if users and not name:
-            return jsonify(users)
-        else:
-            return jsonify({
-                'msg': 'users is null'
-            })
+    return jsonify([{"id": user.id, "uid": user.uid, "name": user.email, "avatar": user.avatar} for user in users])
+
+
+@users_bp.route("/<user_id>", methods=["GET"])
+def get_user_by_id(user_id):
+    user = conn.session.scalars(select(User).where(User.id == user_id)).one()
+
+    return jsonify({"id": user.id, "uid": user.uid, "name": user.email, "avatar": user.avatar})
+
+
+@users_bp.route("/curr_user", methods=["GET"])
+@token_auth.login_required
+def get_current_user():
+    user = token_auth.current_user()
+    return jsonify(user)
 
 
 @users_bp.route("", methods=["POST"])
-def addUser():
-    if request.method == 'POST':
-        name = request.form['name']
-        email = request.form['email']
-        images = request.files['avatar']
-        image_ext = os.path.splitext(images.filename)[1]
+def add_user():
+    forms = request.form
+    uid = secrets.token_hex(16)
+    image_file = request.files['avatar']
+    image_ext = os.path.splitext(image_file.filename)[1]
+    if image_ext != '.jpg' and image_ext != '.jpeg' and image_ext != '.png':
+        return jsonify({
+            'msg': 'image format must be jpg or png or jpeg'
+        }), 400
+    image_file.filename = secrets.token_hex(16) + image_ext
+    image = bucket.blob('avatar/' + image_file.filename)
+    image.upload_from_file(image_file, content_type="image")
+    public_url = image.public_url
 
-        if image_ext != '.jpg' and image_ext != '.jpeg' and image_ext != '.png':
-            return jsonify({
-                'msg': 'image format must be jpg or png or jpeg'
-            }), 400
-
-        images.filename = secrets.token_hex(16) + image_ext
-        image = bucket.blob('avatar/' + images.filename)
-        image.upload_from_file(images, content_type="image")
-        public_url = image.public_url
-        user = {
-            'email': email,
-            'name': name,
-            'avatar': public_url
+    conn.session.execute(insert(User).values(
+        email=forms['email'], password=generate_password_hash(forms['password']), uid=uid, avatar=public_url, name=forms['name']))
+    conn.session.commit()
+    return jsonify(
+        {
+            "msg": f"User {forms['name']} is added"
         }
-        users.append(user)
-        return jsonify(
-            {
-                'msg': "User {} has been added with avatar {}".format(name, public_url)
-            }
-        ), 201
+    )
 
 
-@users_bp.route("", methods=["PUT"])
-def editUser():
-    name = request.form['name']
-    email = request.form['email']
-    name_param = request.args.get('name_param')
+@users_bp.route("/<uid>", methods=["PUT"])
+@token_auth.login_required
+def edit_user(uid):
+    forms = request.form
+    image_file = request.files['avatar']
+    image_ext = os.path.splitext(image_file.filename)[1]
+    if image_ext != '.jpg' and image_ext != '.jpeg' and image_ext != '.png':
+        return jsonify({
+            'msg': 'image format must be jpg or png or jpeg'
+        }), 400
+    image_file.filename = secrets.token_hex(16) + image_ext
+    image = bucket.blob('avatar/' + image_file.filename)
+    image.upload_from_file(image_file, content_type="image")
+    public_url = image.public_url
 
-    for item_list in users:
-        if (item_list['name'] == name_param):
-            item_list['name'] = name
-            item_list['email'] = email
-            return jsonify({
-                'msg': "User {} has been changed to {}".format(name_param, name)
-            }), 201
+    conn.session.execute(update(User).where(User.uid == uid).values(
+        email=forms['email'], password=generate_password_hash(forms['password']), avatar=public_url, name=forms['name']))
+    conn.session.commit()
     return jsonify({
-        "msg": "User {} is not exist".format(name_param)
-    }), 400
+        "msg": "User has been updated"
+    })
 
 
-@users_bp.route("", methods=["DELETE"])
-def deleteUser():
-    name = request.args.get('name')
-
-    for item_list in users:
-        if (item_list['name'] == name):
-            users.remove(item_list)
-            return jsonify({
-                "msg": "User {} has been deleted".format(name)
-            }), 201
+@users_bp.route("/<uid>", methods=["DELETE"])
+@token_auth.login_required
+def delete_user(uid):
+    conn.session.execute(delete(User).where(User.uid == uid))
+    conn.session.commit()
     return jsonify({
-        "msg": "User {} is not exist".format(name)
-    }), 404
+        "msg": "User has been deleted"
+    })
