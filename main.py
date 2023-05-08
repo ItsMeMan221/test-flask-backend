@@ -6,8 +6,9 @@ from routes.errors import error_bp
 
 app = Flask(__name__)
 
-
+# Need Change Config
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:@localhost:3306/test-flask-db"
+
 app.config["SECRET_KEY"] = "19eb9aeb4516b29dfd246d2d72f38a9a"
 
 
