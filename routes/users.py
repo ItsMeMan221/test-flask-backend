@@ -7,7 +7,6 @@ from module.uploadImg import bucket
 from connector import conn
 from routes.token import token_auth
 from werkzeug.security import generate_password_hash
-from routes.token import sec_keys
 
 users_bp = Blueprint("user", __name__, url_prefix="/user")
 
@@ -27,17 +26,12 @@ def get_user_by_id(user_id):
     return jsonify({"id": user.id, "uid": user.uid, "name": user.email, "avatar": user.avatar})
 
 
-@users_bp.route("/curr_user", methods=["GET"])
-@token_auth.login_required
-def get_current_user():
-    user = token_auth.current_user()
-    return jsonify(user)
-
-
 @users_bp.route("", methods=["POST"])
 def add_user():
     forms = request.form
     uid = secrets.token_hex(16)
+
+    # Processing Image
     image_file = request.files['avatar']
     image_ext = os.path.splitext(image_file.filename)[1]
     if image_ext != '.jpg' and image_ext != '.jpeg' and image_ext != '.png':
@@ -49,9 +43,12 @@ def add_user():
     image.upload_from_file(image_file, content_type="image")
     public_url = image.public_url
 
+    # Insert to database
     conn.session.execute(insert(User).values(
         email=forms['email'], password=generate_password_hash(forms['password']), uid=uid, avatar=public_url, name=forms['name']))
     conn.session.commit()
+
+    # Return a msg
     return jsonify(
         {
             "msg": f"User {forms['name']} is added"
